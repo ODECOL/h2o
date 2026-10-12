@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H2O – Enregistrer une séance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<style>
+  :root {
+    --papier: #FBFCF7;
+    --reglure: #E6EDF6;
+    --reglure-forte: #C8D8EB;
+    --marge: #E7A3B2;
+    --encre: #22408C;
+    --encre-claire: #4A64A8;
+    --rouge: #C4302B;
+    --crayon: #5A6170;
+    --vert: #2E7D4F;
+    --police: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: var(--police);
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--encre);
+    background-color: var(--papier);
+    /* réglure Seyès : interlignes fins, lignes fortes tous les 4, colonnes, marge */
+    background-image:
+      linear-gradient(90deg, transparent 47px, var(--marge) 47px, var(--marge) 49px, transparent 49px),
+      repeating-linear-gradient(0deg, var(--reglure-forte) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(0deg, var(--reglure) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(90deg, var(--reglure) 0 1px, transparent 1px 32px);
+    min-height: 100vh;
+  }
+  main {
+    max-width: 460px;
+    margin: 0 auto;
+    padding: 28px 20px 48px 68px;
+  }
+  h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 4px; }
+  .sous-titre { margin: 0 0 32px; color: var(--crayon); font-size: 1rem; }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; }
+  p { margin: 0 0 16px; }
+  .discret { color: var(--crayon); font-size: 0.95rem; }
+  [hidden] { display: none !important; }
+
+  label.champ { display: block; font-weight: 700; margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%; font: inherit; font-size: 1.3rem; letter-spacing: 0.08em;
+    padding: 12px 14px; border: 2px solid var(--encre); border-radius: 6px;
+    background: #fff; color: var(--encre); text-transform: uppercase;
+  }
+  button, .bouton {
+    font: inherit; font-weight: 700; cursor: pointer;
+    border-radius: 6px; padding: 14px 18px; min-height: 52px;
+    border: 2px solid var(--encre); background: var(--encre); color: #fff;
+  }
+  button.second { background: #fff; color: var(--encre); }
+  button.lien {
+    border: none; background: none; color: var(--encre-claire); padding: 0; min-height: 0;
+    font-weight: 400; text-decoration: underline; text-underline-offset: 3px;
+  }
+  button:disabled { opacity: 0.45; cursor: default; }
+  :focus-visible { outline: 3px solid var(--rouge); outline-offset: 3px; }
+  .rangee { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+  .rangee > button { flex: 1 1 160px; }
+
+  .classe {
+    border-left: 4px solid var(--encre); padding: 4px 0 4px 12px; margin-bottom: 24px;
+  }
+  .classe strong { display: block; font-size: 1.15rem; }
+
+  fieldset { border: none; margin: 0 0 24px; padding: 0; }
+  legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
+  .choix { display: flex; align-items: center; gap: 12px; padding: 10px 0; cursor: pointer; }
+  .choix input { width: 24px; height: 24px; accent-color: var(--encre); margin: 0; }
+
+  /* le bouton d'enregistrement : un disque d'encre dont l'anneau suit la voix */
+  .scene { display: flex; flex-direction: column; align-items: center; margin: 8px 0 24px; }
+  .disque {
+    --niveau: 0;
+    width: 176px; height: 176px; border-radius: 50%;
+    border: none; padding: 0; background: var(--encre); color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    box-shadow: 0 0 0 calc(4px + var(--niveau) * 34px) rgba(34, 64, 140, 0.16);
+    transition: box-shadow 90ms linear, background-color 200ms;
+  }
+  .disque svg { width: 52px; height: 52px; }
+  .disque span { font-size: 1rem; }
+  .disque.actif { background: var(--rouge); box-shadow: 0 0 0 calc(4px + var(--niveau) * 34px) rgba(196, 48, 43, 0.2); }
+  .disque.pause { background: var(--crayon); box-shadow: none; }
+  .chrono {
+    font-size: 3.4rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    margin: 20px 0 0; line-height: 1;
+  }
+  .alerte {
+    border-left: 4px solid var(--rouge); padding: 6px 0 6px 12px; margin: 16px 0;
+    color: var(--rouge);
+  }
+  .succes { border-left: 4px solid var(--vert); padding: 6px 0 6px 12px; color: var(--vert); }
+  audio { width: 100%; margin: 8px 0 4px; }
+  .barre { height: 14px; border: 2px solid var(--encre); border-radius: 7px; overflow: hidden; background: #fff; }
+  .barre div { height: 100%; width: 0; background: var(--encre); transition: width 300ms; }
+  details { margin-top: 32px; }
+  summary { cursor: pointer; color: var(--encre-claire); text-decoration: underline; text-underline-offset: 3px; }
+  details[open] summary { margin-bottom: 12px; }
+  input[type=file] { font: inherit; font-size: 0.95rem; max-width: 100%; }
+  code.nom { word-break: break-all; font-size: 0.9rem; }
+
+  @media (max-width: 380px) {
+    body { background-image:
+      linear-gradient(90deg, transparent 27px, var(--marge) 27px, var(--marge) 29px, transparent 29px),
+      repeating-linear-gradient(0deg, var(--reglure-forte) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(0deg, var(--reglure) 0 1px, transparent 1px 8px); }
+    main { padding-left: 44px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .disque, .barre div { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Enregistrer une séance</h1>
+  <p class="sous-titre">Journal de classe H2O, association Od'écol</p>
+
+  <!-- 1. Code de la classe -->
+  <section id="ecran-code" hidden>
+    <label class="champ" for="code">Code de la classe</label>
+    <p class="discret">Il vous a été transmis par Od'écol lors de l'inscription.</p>
+    <input id="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="H2O…">
+    <div class="rangee"><button id="btn-code">Continuer</button></div>
+    <p id="erreur-code" class="alerte" hidden></p>
+  </section>
+
+  <!-- 2. Prêt à enregistrer -->
+  <section id="ecran-pret" hidden>
+    <div class="classe">
+      <strong id="nom-ecole"></strong>
+      <span id="nom-classe"></span>
+      <div><button class="lien" id="btn-changer">Changer de classe</button></div>
+    </div>
+
+    <fieldset>
+      <legend>Quelle séance enregistrez-vous ?</legend>
+      <label class="choix"><input type="radio" name="seance" value="quoideneuf"> Quoi de neuf ?</label>
+      <label class="choix"><input type="radio" name="seance" value="appris"> Qu'as-tu appris aujourd'hui ?</label>
+      <label class="choix"><input type="radio" name="seance" value="autre"> Une autre séance</label>
+    </fieldset>
+
+    <div class="scene">
+      <button class="disque" id="btn-demarrer" aria-label="Démarrer l'enregistrement">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path>
+        </svg>
+        <span>Démarrer</span>
+      </button>
+    </div>
+    <p class="discret">Posez le téléphone au milieu du groupe et laissez l'écran allumé pendant toute la séance.</p>
+    <p id="erreur-pret" class="alerte" hidden></p>
+
+    <details>
+      <summary>Envoyer un enregistrement déjà fait</summary>
+      <p class="discret">Choisissez d'abord le type de séance ci-dessus. Formats acceptés : mp3, m4a, wav, aac, mp4, mov, 80 Mo au maximum.</p>
+      <label class="champ" for="fichier">Fichier</label>
+      <input id="fichier" type="file" accept="audio/*,video/mp4,video/quicktime,.m4a,.mp3,.wav,.aac,.mp4,.mov">
+      <label class="champ" for="date-fichier" style="margin-top:12px">Date de la séance</label>
+      <input id="date-fichier" type="date" style="font:inherit;padding:8px">
+      <div class="rangee"><button class="second" id="btn-fichier" disabled>Vérifier ce fichier</button></div>
+    </details>
+  </section>
+
+  <!-- 3. Enregistrement en cours -->
+  <section id="ecran-enreg" hidden>
+    <div class="scene">
+      <div class="disque actif" id="disque-enreg" role="img" aria-label="Niveau sonore capté">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path>
+        </svg>
+        <span id="etat-enreg">Enregistrement</span>
+      </div>
+      <p class="chrono" id="chrono" aria-live="off">00:00</p>
+    </div>
+    <p id="alerte-silence" class="alerte" hidden>Le micro ne capte presque rien. Rapprochez le téléphone des élèves.</p>
+    <p id="alerte-veille" class="alerte" hidden></p>
+    <div class="rangee">
+      <button class="second" id="btn-pause">Mettre en pause</button>
+      <button id="btn-terminer">Terminer</button>
+    </div>
+  </section>
+
+  <!-- 4. Relecture -->
+  <section id="ecran-relecture" hidden>
+    <h2 id="titre-relecture">Séance enregistrée</h2>
+    <p class="discret" id="detail-relecture"></p>
+    <audio id="lecteur" controls preload="metadata"></audio>
+    <div class="rangee">
+      <button id="btn-envoyer">Envoyer à Od'écol</button>
+      <button class="second" id="btn-recommencer">Recommencer</button>
+    </div>
+  </section>
+
+  <!-- 5. Envoi -->
+  <section id="ecran-envoi" hidden>
+    <h2>Envoi en cours</h2>
+    <div class="barre" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="barre"><div></div></div>
+    <p class="discret" id="texte-envoi" style="margin-top:8px">0 %</p>
+    <p>Gardez cette page ouverte jusqu'à la fin de l'envoi.</p>
+    <div id="bloc-erreur-envoi" hidden>
+      <p class="alerte" id="erreur-envoi"></p>
+      <div class="rangee">
+        <button id="btn-reessayer">Réessayer l'envoi</button>
+        <button class="second" id="btn-retour-relecture">Revenir à l'enregistrement</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Envoyé -->
+  <section id="ecran-fini" hidden>
+    <p class="succes"><strong>Envoyé.</strong> L'enregistrement est bien arrivé chez Od'écol.</p>
+    <p class="discret">Nom du fichier : <code class="nom" id="nom-envoye"></code></p>
+    <div class="rangee"><button id="btn-autre">Enregistrer une autre séance</button></div>
+  </section>
+
+  <p id="erreur-generale" class="alerte" hidden></p>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // Laisser vide quand la page est servie par Apps Script.
+  // Pour une page hébergée ailleurs : coller ici l'adresse « /exec » du déploiement.
+  var API_URL = '';
+
+  var FREQUENCE = 16000;        // Hz, suffisant pour la parole
+  var DEBIT = 32;               // kbit/s, environ 4,6 Mo pour 20 minutes
+  var DUREE_MAX = 60 * 60;      // arrêt automatique au bout d'une heure
+  var TAILLE_MORCEAU = 3 * 1024 * 1024;   // multiple de 256 Ko, exigé par le Drive
+
+  var $ = function (id) { return document.getElementById(id); };
+  var ecrans = ['ecran-code', 'ecran-pret', 'ecran-enreg', 'ecran-relecture', 'ecran-envoi', 'ecran-fini'];
+
+  var etat = {
+    code: null, classe: null,
+    enregistrement: null,   // { blob, extension, duree, date, heure, seance }
+    envoi: null,            // { id, prochain, nb }
+    enCours: false
+  };
+
+  function montrer(id) {
+    ecrans.forEach(function (e) { $(e).hidden = (e !== id); });
+    window.scrollTo(0, 0);
+  }
+  function erreur(id, texte) { var el = $(id); el.textContent = texte || ''; el.hidden = !texte; }
+  function memoire(cle, valeur) {
+    try {
+      if (valeur === undefined) return localStorage.getItem(cle);
+      if (valeur === null) localStorage.removeItem(cle); else localStorage.setItem(cle, valeur);
+    } catch (e) { return null; }
+  }
+  function deuxChiffres(n) { return (n < 10 ? '0' : '') + n; }
+  function duree(sec) {
+    sec = Math.round(sec);
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m ? m + ' min ' + deuxChiffres(s) + ' s' : s + ' s';
+  }
+  function mo(octets) {
+    if (octets < 1024 * 1024) return Math.max(1, Math.round(octets / 1024)) + ' Ko';
+    return (octets / 1024 / 1024).toFixed(1).replace('.', ',') + ' Mo';
+  }
+  function seanceChoisie() {
+    var r = document.querySelector('input[name=seance]:checked');
+    return r ? r.value : null;
+  }
+
+  // -------------------------------------------------- appels au serveur
+
+  function appel(action) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (window.google && google.script && google.script.run) {
+      return new Promise(function (ok, ko) {
+        var r = google.script.run.withSuccessHandler(ok).withFailureHandler(function (e) {
+          ko(new Error(String((e && e.message) || e).replace(/^(Exception|Error):\s*/, '')));
+        });
+        r[action].apply(r, args);
+      });
+    }
+    if (!API_URL) return Promise.reject(new Error('Adresse du service non configurée.'));
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: action, args: args })
+    }).then(function (r) { return r.json(); }).then(function (r) {
+      if (!r.ok) throw new Error(r.erreur);
+      return r.resultat;
+    });
+  }
+
+  // -------------------------------------------------- 1. code de la classe
+
+  function validerCode(code, silencieux) {
+    code = String(code || '').trim().toUpperCase();
+    if (!code) { erreur('erreur-code', 'Saisissez le code de la classe.'); return; }
+    $('btn-code').disabled = true;
+    erreur('erreur-code', '');
+    appel('verifierCode', code).then(function (c) {
+      etat.code = code; etat.classe = c;
+      memoire('h2o_code', code);
+      $('nom-ecole').textContent = c.ecole + ', ' + c.ville;
+      $('nom-classe').textContent = 'Classe : ' + c.classe;
+      montrer('ecran-pret');
+    }).catch(function (e) {
+      memoire('h2o_code', null);
+      montrer('ecran-code');
+      if (!silencieux) erreur('erreur-code', e.message);
+    }).then(function () { $('btn-code').disabled = false; });
+  }
+
+  $('btn-code').onclick = function () { validerCode($('code').value); };
+  $('code').onkeydown = function (e) { if (e.key === 'Enter') validerCode($('code').value); };
+  $('btn-changer').onclick = function () {
+    memoire('h2o_code', null); etat.code = null; $('code').value = ''; montrer('ecran-code');
+  };
+
+  // -------------------------------------------------- 3. enregistrement
+
+  var rec = null;
+
+  function reechantillonneur(rapport) {
+    var reste = new Float32Array(0);
+    return function (entree) {
+      var d = new Float32Array(reste.length + entree.length);
+      d.set(reste); d.set(entree, reste.length);
+      var n = Math.floor(d.length / rapport);
+      var sortie = new Int16Array(n);
+      for (var i = 0; i < n; i++) {
+        var a = Math.floor(i * rapport), b = Math.floor((i + 1) * rapport), t = 0;
+        for (var j = a; j < b; j++) t += d[j];
+        var v = Math.max(-1, Math.min(1, t / (b - a)));
+        sortie[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+      }
+      reste = d.slice(Math.floor(n * rapport));
+      return sortie;
+    };
+  }
+
+  function messageMicro(e) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return 'Ce navigateur ne permet pas d\'enregistrer ici. Ouvrez la page dans Safari (iPhone, iPad) ou Chrome (Android).';
+    }
+    if (e && e.name === 'NotAllowedError') {
+      return 'L\'accès au micro est refusé. Autorisez le micro pour cette page dans les réglages du navigateur, puis rechargez la page.';
+    }
+    if (e && e.name === 'NotFoundError') return 'Aucun micro n\'a été trouvé sur cet appareil.';
+    return 'Le micro n\'a pas pu démarrer (' + ((e && e.message) || 'erreur inconnue') + ').';
+  }
+
+  function demarrer() {
+    erreur('erreur-pret', '');
+    var seance = seanceChoisie();
+    if (!seance) { erreur('erreur-pret', 'Choisissez d\'abord le type de séance.'); return; }
+    if (!window.lamejs) {
+      erreur('erreur-pret', 'Un composant de la page ne s\'est pas chargé. Vérifiez la connexion, puis rechargez la page.');
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { erreur('erreur-pret', messageMicro()); return; }
+
+    navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true }
+    }).then(function (flux) {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      var ctx = new Ctx();
+      if (ctx.sampleRate < FREQUENCE) throw new Error('fréquence du micro trop basse');
+      var source = ctx.createMediaStreamSource(flux);
+      var proc = ctx.createScriptProcessor(4096, 1, 1);
+      var maintenant = new Date();
+      rec = {
+        flux: flux, ctx: ctx, source: source, proc: proc,
+        encodeur: new lamejs.Mp3Encoder(1, FREQUENCE, DEBIT),
+        convertir: reechantillonneur(ctx.sampleRate / FREQUENCE),
+        morceaux: [], taille: 0, echantillons: 0, pause: false,
+        silence: 0, seance: seance,
+        date: maintenant.getFullYear() + '-' + deuxChiffres(maintenant.getMonth() + 1) + '-' + deuxChiffres(maintenant.getDate()),
+        heure: deuxChiffres(maintenant.getHours()) + 'h' + deuxChiffres(maintenant.getMinutes())
+      };
+      proc.onaudioprocess = traiterSon;
+      source.connect(proc);
+      proc.connect(ctx.destination);   // nécessaire pour que le traitement tourne ; la sortie reste muette
+      if (ctx.resume) ctx.resume();
+      etat.enCours = true;
+      $('btn-pause').textContent = 'Mettre en pause';
+      $('etat-enreg').textContent = 'Enregistrement';
+      $('disque-enreg').className = 'disque actif';
+      $('chrono').textContent = '00:00';
+      $('alerte-silence').hidden = true;
+      $('alerte-veille').hidden = true;
+      montrer('ecran-enreg');
+      garderEcranAllume();
+    }).catch(function (e) { erreur('erreur-pret', messageMicro(e)); });
+  }
+
+  function traiterSon(evt) {
+    if (!rec || rec.pause) return;
+    var entree = evt.inputBuffer.getChannelData(0);
+    var somme = 0;
+    for (var i = 0; i < entree.length; i += 4) somme += entree[i] * entree[i];
+    var rms = Math.sqrt(somme / (entree.length / 4));
+    var niveau = Math.min(1, rms * 6);
+    $('disque-enreg').style.setProperty('--niveau', niveau.toFixed(2));
+
+    var secondes = entree.length / rec.ctx.sampleRate;
+    rec.silence = rms < 0.004 ? rec.silence + secondes : 0;
+    $('alerte-silence').hidden = rec.silence < 8;
+
+    var mp3 = rec.encodeur.encodeBuffer(rec.convertir(entree));
+    if (mp3.length) { rec.morceaux.push(new Uint8Array(mp3)); rec.taille += mp3.length; }
+    rec.echantillons += entree.length;
+
+    var total = rec.echantillons / rec.ctx.sampleRate;
+    $('chrono').textContent = deuxChiffres(Math.floor(total / 60)) + ':' + deuxChiffres(Math.floor(total % 60));
+    if (total >= DUREE_MAX) terminer();
+  }
+
+  function basculerPause() {
+    if (!rec) return;
+    rec.pause = !rec.pause;
+    $('btn-pause').textContent = rec.pause ? 'Reprendre' : 'Mettre en pause';
+    $('etat-enreg').textContent = rec.pause ? 'En pause' : 'Enregistrement';
+    $('disque-enreg').className = rec.pause ? 'disque pause' : 'disque actif';
+    if (!rec.pause && rec.ctx.state !== 'running' && rec.ctx.resume) rec.ctx.resume();
+  }
+
+  function terminer() {
+    if (!rec) return;
+    var r = rec; rec = null;
+    try { r.source.disconnect(); r.proc.disconnect(); } catch (e) {}
+    r.flux.getTracks().forEach(function (t) { t.stop(); });
+    try { r.ctx.close(); } catch (e) {}
+    var fin = r.encodeur.flush();
+    if (fin.length) { r.morceaux.push(new Uint8Array(fin)); r.taille += fin.length; }
+    etat.enCours = false;
+    libererEcran();
+    var dureeSec = r.echantillons / r.ctx.sampleRate;
+    if (dureeSec < 2) { montrer('ecran-pret'); erreur('erreur-pret', 'L\'enregistrement est trop court pour être envoyé.'); return; }
+    preparerRelecture({
+      blob: new Blob(r.morceaux, { type: 'audio/mpeg' }), extension: 'mp3',
+      duree: dureeSec, date: r.date, heure: r.heure, seance: r.seance
+    });
+  }
+
+  $('btn-demarrer').onclick = demarrer;
+  Array.prototype.forEach.call(document.querySelectorAll('input[name=seance]'), function (r) {
+    r.onchange = function () { erreur('erreur-pret', ''); };
+  });
+  $('btn-pause').onclick = basculerPause;
+  $('btn-terminer').onclick = terminer;
+
+  // -------------------------------------------------- écran allumé et mise en veille
+
+  var verrou = null;
+  function garderEcranAllume() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (v) { verrou = v; }).catch(function () {});
+  }
+  function libererEcran() { if (verrou) { verrou.release().catch(function () {}); verrou = null; } }
+
+  var cacheA = null;
+  document.addEventListener('visibilitychange', function () {
+    if (!etat.enCours) return;
+    if (document.hidden) { cacheA = Date.now(); return; }
+    garderEcranAllume();
+    if (rec && rec.ctx.state !== 'running' && rec.ctx.resume) rec.ctx.resume();
+    if (cacheA && Date.now() - cacheA > 3000) {
+      erreur('alerte-veille', 'La page a été masquée pendant ' + duree((Date.now() - cacheA) / 1000) +
+        '. Sur certains téléphones, le son n\'est pas enregistré pendant ce temps.');
+    }
+    cacheA = null;
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (etat.enCours || (etat.enregistrement && !etat.enregistrement.envoye)) {
+      e.preventDefault(); e.returnValue = '';
+    }
+  });
+
+  // -------------------------------------------------- 4. relecture
+
+  var urlLecture = null;
+  function preparerRelecture(enr) {
+    etat.enregistrement = enr;
+    etat.envoi = null;
+    if (urlLecture) URL.revokeObjectURL(urlLecture);
+    urlLecture = URL.createObjectURL(enr.blob);
+    $('lecteur').src = urlLecture;
+    $('titre-relecture').textContent = enr.duree ? 'Séance enregistrée, ' + duree(enr.duree) : 'Fichier prêt à envoyer';
+    $('detail-relecture').textContent = 'Taille : ' + mo(enr.blob.size) + '. Réécoutez un passage si vous le souhaitez, puis envoyez.';
+    montrer('ecran-relecture');
+  }
+
+  $('btn-recommencer').onclick = function () {
+    if (!confirm('L\'enregistrement sera effacé. Recommencer ?')) return;
+    etat.enregistrement = null; etat.envoi = null;
+    $('lecteur').removeAttribute('src');
+    montrer('ecran-pret');
+  };
+
+  // Fichier déjà enregistré
+  $('fichier').onchange = function () { $('btn-fichier').disabled = !this.files.length; };
+  $('btn-fichier').onclick = function () {
+    erreur('erreur-pret', '');
+    var f = $('fichier').files[0];
+    var seance = seanceChoisie();
+    if (!seance) { erreur('erreur-pret', 'Choisissez d\'abord le type de séance.'); return; }
+    if (!f) return;
+    var ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (['mp3', 'm4a', 'wav', 'aac', 'mp4', 'mov'].indexOf(ext) < 0) {
+      erreur('erreur-pret', 'Ce format n\'est pas accepté. Formats possibles : mp3, m4a, wav, aac, mp4, mov.'); return;
+    }
+    if (f.size > 80 * 1024 * 1024) { erreur('erreur-pret', 'Ce fichier dépasse 80 Mo.'); return; }
+    var d = $('date-fichier').value;
+    if (!d) { erreur('erreur-pret', 'Indiquez la date de la séance.'); return; }
+    var modif = new Date(f.lastModified || Date.now());
+    preparerRelecture({
+      blob: f, extension: ext, duree: 0, seance: seance, date: d,
+      heure: deuxChiffres(modif.getHours()) + 'h' + deuxChiffres(modif.getMinutes())
+    });
+  };
+
+  // -------------------------------------------------- 5. envoi par morceaux
+
+  function enBase64(octets) {
+    var s = '';
+    for (var i = 0; i < octets.length; i += 0x8000) {
+      s += String.fromCharCode.apply(null, octets.subarray(i, i + 0x8000));
+    }
+    return btoa(s);
+  }
+
+  function progression(p) {
+    var pc = Math.round(p * 100);
+    $('barre').firstElementChild.style.width = pc + '%';
+    $('barre').setAttribute('aria-valuenow', pc);
+    $('texte-envoi').textContent = pc + ' %';
+  }
+
+  function avecEssais(fn, essais) {
+    return fn().catch(function (e) {
+      if (essais <= 1 || e.message === 'ENVOI_EXPIRE') throw e;
+      return new Promise(function (ok) { setTimeout(ok, 2000); }).then(function () { return avecEssais(fn, essais - 1); });
+    });
+  }
+
+  function envoyer() {
+    var enr = etat.enregistrement;
+    if (!enr) return;
+    $('bloc-erreur-envoi').hidden = true;
+    montrer('ecran-envoi');
+    var octets;
+    enr.blob.arrayBuffer().then(function (buf) {
+      octets = new Uint8Array(buf);
+      var nb = Math.ceil(octets.length / TAILLE_MORCEAU);
+      if (etat.envoi && etat.envoi.id) return etat.envoi;
+      return appel('commencerEnvoi', etat.code, {
+        seance: enr.seance, date: enr.date, heure: enr.heure,
+        taille: octets.length, duree: Math.round(enr.duree), extension: enr.extension
+      }).then(function (id) { etat.envoi = { id: id, prochain: 0, nb: nb }; return etat.envoi; });
+    }).then(function (envoi) {
+      progression(envoi.prochain / (envoi.nb + 1));
+      var suite = Promise.resolve();
+      for (var i = envoi.prochain; i < envoi.nb; i++) {
+        (function (i) {
+          suite = suite.then(function () {
+            var b64 = enBase64(octets.subarray(i * TAILLE_MORCEAU, (i + 1) * TAILLE_MORCEAU));
+            return avecEssais(function () { return appel('envoyerMorceau', envoi.id, i * TAILLE_MORCEAU, b64); }, 3);
+          }).then(function () { envoi.prochain = i + 1; progression(envoi.prochain / (envoi.nb + 1)); });
+        })(i);
+      }
+      return suite.then(function () {
+        return avecEssais(function () { return appel('terminerEnvoi', envoi.id); }, 2);
+      });
+    }).then(function (res) {
+      progression(1);
+      enr.envoye = true;
+      $('nom-envoye').textContent = res.nom;
+      montrer('ecran-fini');
+    }).catch(function (e) {
+      if (e.message === 'ENVOI_EXPIRE') {
+        etat.envoi = null;
+        e = new Error('L\'envoi précédent a expiré ; il repartira du début.');
+      }
+      erreur('erreur-envoi', 'L\'envoi s\'est interrompu : ' + e.message +
+        ' L\'enregistrement est conservé tant que cette page reste ouverte. Vérifiez la connexion, puis réessayez.');
+      $('bloc-erreur-envoi').hidden = false;
+    });
+  }
+
+  $('btn-envoyer').onclick = envoyer;
+  $('btn-reessayer').onclick = envoyer;
+  $('btn-retour-relecture').onclick = function () { montrer('ecran-relecture'); };
+  $('btn-autre').onclick = function () {
+    etat.enregistrement = null; etat.envoi = null;
+    $('lecteur').removeAttribute('src');
+    var r = document.querySelector('input[name=seance]:checked'); if (r) r.checked = false;
+    $('fichier').value = ''; $('btn-fichier').disabled = true;
+    montrer('ecran-pret');
+  };
+
+  // -------------------------------------------------- démarrage
+
+  var aujourdhui = new Date();
+  $('date-fichier').value = aujourdhui.getFullYear() + '-' + deuxChiffres(aujourdhui.getMonth() + 1) + '-' + deuxChiffres(aujourdhui.getDate());
+  var codeMemorise = memoire('h2o_code');
+  montrer('ecran-code');
+  if (codeMemorise) { $('code').value = codeMemorise; validerCode(codeMemorise, true); }
+})();
+</script>
+</body>
+</html>
